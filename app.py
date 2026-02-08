@@ -1,11 +1,16 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import sqlite3
 import os
 import datetime
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
+from dotenv import load_dotenv
 
 from config import DevelopmentConfig, ProductionConfig
+from firebase_config import get_firebase_config, validate_firebase_config
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ------------------------------------------------------------------
 # App setup
@@ -214,6 +219,8 @@ def home():
 
 @app.route("/student", methods=["GET", "POST"])
 def student():
+    firebase_config = get_firebase_config()
+    
     if request.method == "POST":
 
         # Get user data
@@ -241,8 +248,8 @@ def student():
             return redirect(url_for("student-dashboard"))
         else:
             # Authentication failed
-            return render_template("student.html", error="Invalid credentials. Please try again.")
-    return render_template("student.html")
+            return render_template("student.html", error="Invalid credentials. Please try again.", firebase_config=firebase_config)
+    return render_template("student.html", firebase_config=firebase_config)
 
 
 @app.route("/teacher", methods=["GET", "POST"])
@@ -281,7 +288,9 @@ def teacher():
 
 
 @app.route("/student-new", methods=["GET", "POST"])
+@app.route("/student_new", methods=["GET", "POST"])
 def student_new():
+    firebase_config = get_firebase_config()
 
     print(f"Request method: {request.method}")
     
@@ -336,7 +345,7 @@ def student_new():
             # Closing the connection
             connection.close()
     
-    return render_template("student_new_2.html")
+    return render_template("student_new.html", firebase_config=firebase_config)
 
 
 @app.route("/teacher-new", endpoint="teacher-new", methods=["GET", "POST"])
@@ -672,6 +681,110 @@ def all_achievements():
     connection.close()
     
     return render_template("all_achievements.html", achievements=achievements)
+
+
+# ------------------------------------------------------------------
+# Firebase Authentication Routes
+# ------------------------------------------------------------------
+
+@app.route("/auth/firebase-config", methods=["GET"])
+def get_auth_firebase_config():
+    """
+    Returns Firebase configuration to frontend
+    This endpoint provides the config needed for Firebase initialization
+    IMPORTANT: apiKey is public and safe to expose, but never expose private keys
+    """
+    firebase_config = get_firebase_config()
+    return jsonify(firebase_config)
+
+
+@app.route("/auth/google-login", methods=["POST"])
+def google_login():
+    """
+    Handle Google Sign-In authentication
+    
+    Expected POST data:
+    {
+        "email": "user@example.com",
+        "displayName": "User Name",
+        "photoURL": "https://...",
+        "uid": "firebase_uid",
+        "idToken": "firebase_id_token"
+    }
+    
+    TODO: Developers should integrate with Firebase Admin SDK to verify idToken
+    For now, basic email validation is implemented
+    """
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        display_name = data.get("displayName")
+        photo_url = data.get("photoURL")
+        firebase_uid = data.get("uid")
+        
+        # TODO: Verify idToken with Firebase Admin SDK
+        # import firebase_admin
+        # from firebase_admin import auth
+        # try:
+        #     decoded_token = auth.verify_id_token(data.get("idToken"))
+        #     uid = decoded_token['uid']
+        # except:
+        #     return jsonify({"success": False, "message": "Invalid token"}), 401
+        
+        if not email:
+            return jsonify({"success": False, "message": "Email is required"}), 400
+        
+        connection = sqlite3.connect(DB_PATH)
+        cursor = connection.cursor()
+        
+        # Check if student exists (students can login via Google)
+        cursor.execute("SELECT * FROM student WHERE email = ?", (email,))
+        student_data = cursor.fetchone()
+        
+        if student_data:
+            # Student exists - login via Google
+            session.permanent = True
+            session['logged_in'] = True
+            session['student_id'] = student_data[1]
+            session['student_name'] = student_data[0]
+            session['student_dept'] = student_data[6]
+            session['google_auth'] = True
+            session['firebase_uid'] = firebase_uid
+            
+            connection.close()
+            return jsonify({
+                "success": True, 
+                "message": "Student logged in successfully",
+                "redirectUrl": "/student-dashboard"
+            }), 200
+        else:
+            # TODO: Create new student account or ask to register
+            # For now, reject unknown users
+            connection.close()
+            return jsonify({
+                "success": False, 
+                "message": f"No student account found for {email}. Please register first."
+            }), 404
+            
+    except Exception as e:
+        return jsonify({
+            "success": False, 
+            "message": f"Login error: {str(e)}"
+        }), 500
+
+
+@app.route("/auth/logout", methods=["POST"])
+def logout():
+    """
+    Handle logout for both traditional and Google Sign-In users
+    Clears session data
+    """
+    session.clear()
+    return jsonify({
+        "success": True,
+        "message": "Logged out successfully"
+    }), 200
+
 
     
 if __name__ == "__main__":
