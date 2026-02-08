@@ -149,71 +149,55 @@ def migrate_achievements_table():
 # ------------------------------------------------------------------
 
 def init_db():
-    if not os.path.exists(DB_PATH):
-        connection = sqlite3.connect(DB_PATH)
-        cursor = connection.cursor()
+    db_path = app.config["DB_PATH"]
 
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS student (
-            student_name TEXT NOT NULL,
-            student_id TEXT PRIMARY KEY,
-            email TEXT UNIQUE NOT NULL,
-            phone_number TEXT,
-            password TEXT NOT NULL,
-            student_gender TEXT,
-            student_dept TEXT
-        )
-        """)
+    connection = sqlite3.connect(db_path)
+    cursor = connection.cursor()
 
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS teacher (
-            teacher_name TEXT NOT NULL,
-            teacher_id TEXT PRIMARY KEY,
-            email TEXT UNIQUE NOT NULL,
-            phone_number TEXT,
-            password TEXT NOT NULL,
-            teacher_gender TEXT,
-            teacher_dept TEXT
-        )
-        """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS student (
+        student_name TEXT NOT NULL,
+        student_id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        phone_number TEXT,
+        password TEXT NOT NULL,
+        student_gender TEXT,
+        student_dept TEXT
+    )
+    """)
 
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS achievements (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            teacher_id TEXT NOT NULL,
-            student_id TEXT NOT NULL,
-            achievement_type TEXT NOT NULL,
-            event_name TEXT NOT NULL,
-            achievement_date DATE NOT NULL,
-            organizer TEXT NOT NULL,
-            position TEXT NOT NULL,
-            achievement_description TEXT,
-            certificate_path TEXT,
-            symposium_theme TEXT,
-            programming_language TEXT,
-            coding_platform TEXT,
-            paper_title TEXT,
-            journal_name TEXT,
-            conference_level TEXT,
-            conference_role TEXT,
-            team_size INTEGER,
-            project_title TEXT,
-            database_type TEXT,
-            difficulty_level TEXT,
-            other_description TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (student_id) REFERENCES student(student_id),
-            FOREIGN KEY (teacher_id) REFERENCES teacher(teacher_id)
-        )
-        """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS teacher (
+        teacher_name TEXT NOT NULL,
+        teacher_id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        phone_number TEXT,
+        password TEXT NOT NULL,
+        teacher_gender TEXT,
+        teacher_dept TEXT
+    )
+    """)
 
-        connection.commit()
-        connection.close()
-    else:
-        add_teacher_id_column()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS achievements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        teacher_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        achievement_type TEXT NOT NULL,
+        event_name TEXT NOT NULL,
+        achievement_date DATE NOT NULL,
+        organizer TEXT NOT NULL,
+        position TEXT NOT NULL,
+        achievement_description TEXT,
+        certificate_path TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (student_id) REFERENCES student(student_id),
+        FOREIGN KEY (teacher_id) REFERENCES teacher(teacher_id)
+    )
+    """)
 
-        
-
+    connection.commit()
+    connection.close()
 
 # Call initialization function
 init_db()
