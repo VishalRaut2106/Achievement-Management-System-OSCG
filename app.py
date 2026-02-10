@@ -4,6 +4,7 @@ import os
 import secrets
 from werkzeug.utils import secure_filename
 import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 app = Flask(__name__)
@@ -261,12 +262,12 @@ def student():
         cursor = connection.cursor()
 
         # Query the database for the student
-        cursor.execute("SELECT * FROM student WHERE student_id = ? AND password = ?", 
-                      (student_id, password))
+        cursor.execute("SELECT * FROM student WHERE student_id = ?", 
+                      (student_id,))
         student_data = cursor.fetchone()
         connection.close()
 
-        if student_data:
+        if student_data and check_password_hash(student_data[4], password):
             # Store user information in session
             session['logged_in'] = True
             session['student_id'] = student_data[1]
@@ -294,12 +295,12 @@ def teacher():
         cursor = connection.cursor()
 
         # Query for the teacher data
-        cursor.execute("SELECT * FROM teacher WHERE teacher_id = ? AND password = ?", 
-                       (teacher_id, password))
+        cursor.execute("SELECT * FROM teacher WHERE teacher_id = ?", 
+                       (teacher_id,))
         teacher_data = cursor.fetchone()
         connection.close()
 
-        if teacher_data:
+        if teacher_data and check_password_hash(teacher_data[4], password):
             # Store user information in session
             session['logged_in'] = True
             session['teacher_id'] = teacher_data[1]
@@ -355,11 +356,12 @@ def student_new():
             connection.commit()
         
         try:
+            hashed_password = generate_password_hash(password)
             # Inserting the values into the student table
             cursor.execute("""
                 INSERT INTO student (student_name, student_id, email, phone_number, password, student_gender, student_dept)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (student_name, student_id, email, phone_number, password, student_gender, student_dept))
+                """, (student_name, student_id, email, phone_number, hashed_password, student_gender, student_dept))
             
             # Committing changes
             connection.commit()
@@ -410,10 +412,11 @@ def teacher_new():
             connection.commit()
 
         try:
+            hashed_password = generate_password_hash(password)
             cursor.execute("""
             INSERT INTO teacher (teacher_name, teacher_id, email, phone_number, password, teacher_gender, teacher_dept)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (teacher_name, teacher_id, email, phone_number, password, teacher_gender, teacher_dept))
+            """, (teacher_name, teacher_id, email, phone_number, hashed_password, teacher_gender, teacher_dept))
 
             # Committing changes
             connection.commit()
